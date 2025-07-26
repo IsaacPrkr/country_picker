@@ -4,8 +4,16 @@ import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QWidget, QComboBox, QLabel
 )
+from PyQt6.QtCore import QThread, pyqtSignal
 
 from .data_fetcher import fetch_country_data
+
+class CountryFetchThread(QThread):
+    result = pyqtSignal(list)
+
+    def run(self):
+        countries = fetch_country_data()
+        self.result.emit(countries)
 
 class MainWindow(QMainWindow):
     def __init__(self, preselect_country=None):
@@ -31,15 +39,15 @@ class MainWindow(QMainWindow):
         # Preselect setup
         self.preselect_country = preselect_country
 
-        # Load data
-        self.load_countries()
+        # Load data asynchronously
+        self.fetch_thread = CountryFetchThread()
+        self.fetch_thread.result.connect(self.populate_countries)
+        self.fetch_thread.start()
 
-    def load_countries(self):
-        countries = fetch_country_data()
+    def populate_countries(self, countries: list[str]):
         countries.sort()
         self.combo_box.addItems(countries)
 
-        # Apply pre-selection if needed
         if self.preselect_country and self.preselect_country in countries:
             index = self.combo_box.findText(self.preselect_country)
             if index != -1:
